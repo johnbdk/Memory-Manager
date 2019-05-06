@@ -15,7 +15,7 @@ int pos_of_object(size_t size){					// returns the position in array that the ob
 
 	position = (int) (log(max(size,8))/log(2));
 	position -= 3;
-
+	//printf("size = %d: position = %d\n", size, position);
 	return position;
 }
 
@@ -43,6 +43,7 @@ void *my_malloc(size_t size){									// function used by users
 	int position;
 
 	object_size = (int) pow(2, ceil(log(size)/log(2)) );
+	printf("size of alloc: %zu, next pow of 2: %zu\n", size, object_size);
 
 	position = object_size_exists(object_size);
 	if( position == -1 ){
@@ -72,7 +73,8 @@ int my_free(void *address){
 	mask = ~(PAGE_SIZE - 1);
 	temp_addr = (void *) (mask & ((long int) address));
 
-	for (int i = 0; i < 9; i++) {
+	int i = 0;
+	for (; i < SLOTS; i++) {
 		if( temp_addr == my_mem[i].address){										// find in what free list to insert freed memory
 			enqueue_head_no_lock(my_mem[i].free_list, address);
 			printf("inserted to free %p\n", address);
@@ -80,5 +82,13 @@ int my_free(void *address){
 		}
 	}
 
+	int numOf8B = pow(2, i+3)/8;
+	const char helpBuf[8] = {0, 0, 0, 0, 0, 0, 0, '\0'};
+	for (int j = 0; j <= numOf8B; j++) {
+		strncpy((char*)address, helpBuf, 8);
+		address += 8;
+	}
+
+	//printf("my_free:\n\tslot = %d, numOf8B = %d\n", i, numOf8B);
 	return 0;
 }

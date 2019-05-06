@@ -6,8 +6,10 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <math.h>
+#include <string.h>
 #include "queue.h"
 
+#define SLOTS 10
 #define PAGE_SIZE sysconf(_SC_PAGE_SIZE)
 #define max(x, y) (((x) > (y)) ? (x) : (y))
 
@@ -17,7 +19,7 @@ typedef struct sblock {
 	void *free_list;				// start of free list
 } superblock;
 
-superblock my_mem[9];				// 9 slots for objects 8, 16, 32, ... 4096
+superblock my_mem[SLOTS];				// 10 slots for objects 8, 16, 32, ... 4096
 
 void mem_init();
 int pos_of_object(size_t obj_size);
