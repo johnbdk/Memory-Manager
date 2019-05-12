@@ -37,3 +37,15 @@ void enqueue_head(queue_t *queue, void *address) {
     queue->head->next->prev = element;
     queue->head->next = element;
 }
+
+int search_queue(queue_t *queue, void *address){
+    
+    for(node_t *curr = queue->head->next; curr != queue->head; curr = curr->next){
+        // printf("%p - %p \n",address,curr->address );
+        if( curr->address == address){
+            return 1;
+        }
+    }
+
+    return 0;
+}

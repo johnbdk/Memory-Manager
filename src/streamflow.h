@@ -29,15 +29,18 @@ struct local_heap {
 
 struct pageblock {
 	int id;
-	int object_size;
-	int num_free_objects;
-	void *free_list;				// start of free list
+	unsigned pageblock_size;
+	unsigned object_size;
+	unsigned num_free_objects;
+	void *freed_list;				// start of free list
 	void *unallocated;				// points to the next unallocated space within a pageblock
-	void *remoted_free_list;
+	void *remotely_freed_list;
 	struct pageblock *next;
 	struct pageblock *prev;
 	struct local_heap *heap;
 };
+
+extern queue_t *table[8];
 
 typedef struct object_class object_class_t;
 typedef struct local_heap local_heap_t;
@@ -45,7 +48,7 @@ typedef struct pageblock pageblock_t;
 
 int my_free(void *address);
 int get_object_class(size_t obj_size);
-int object_class_exist(size_t obj_size);
+int object_class_exists(size_t obj_size);
 void *my_malloc(size_t size);
 void allocate_memory(size_t obj_size);
 

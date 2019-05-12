@@ -18,5 +18,6 @@ typedef struct queue {
 queue_t *queue_create();
 void *dequeue_head(queue_t *head);
 void enqueue_head(queue_t *head, void *address);
+int search_queue(queue_t *queue, void *address);
 
 #endif
