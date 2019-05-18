@@ -1,51 +1,21 @@
 #include "queue.h"
 
-queue_t *queue_create() {
-    queue_t *queue;
-
-    queue = (queue_t *) mmap(NULL, sizeof(queue_t), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-    queue->head = (node_t *) mmap(NULL, sizeof(node_t), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-    queue->head->next = queue->head;
-    queue->head->prev = queue->head;
-    queue->head->address = NULL;
-    return queue;
-}
-
-void *dequeue_head(queue_t *queue) {
+node_t *unstack(node_t *queue) {
     node_t *curr;
 
-    if ((queue->head->next == queue->head) || (queue->head == NULL)) {
+    if( queue->next == NULL ){
         return NULL;
     }
 
-    curr = queue->head->next;
-    queue->head->next = curr->next;
-    curr->next->prev = queue->head;
-    return curr->address;
+    curr = queue->next;
+    queue->next = curr->next;
+
+    return curr;
 }
 
-void enqueue_head(queue_t *queue, void *address) {
-    node_t *element = (node_t *) mmap(NULL, sizeof(node_t), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
+void stack(node_t *queue, node_t *element) {
 
-    if (queue->head == NULL) {
-        return;
-    }
+    element->next = queue->next;
+    queue->next = element;
 
-    element->address = address;
-    element->next = queue->head->next;
-    element->prev = queue->head;
-    queue->head->next->prev = element;
-    queue->head->next = element;
-}
-
-int search_queue(queue_t *queue, void *address){
-    
-    for(node_t *curr = queue->head->next; curr != queue->head; curr = curr->next){
-        // printf("%p - %p \n",address,curr->address );
-        if( curr->address == address){
-            return 1;
-        }
-    }
-
-    return 0;
 }

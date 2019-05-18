@@ -29,24 +29,34 @@ int object_class_exists(size_t size){			// if objects of this size already exist
 void allocate_memory(size_t size){	
 	int position = get_object_class(size);
 	pageblock_t *new_pageblock;
-	long int mask = 15;
-
+	void *temp_addr;
+	unsigned long mask = 15;
 	int allocate_size = PAGEBLOCK_SIZE;			// this will be replaced with more clever logic
 
-	new_pageblock = (pageblock_t *) mmap(NULL, allocate_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_SHARED, 0, 0);			// allocate 1 page for each object size
+	unsigned long page_block_mask = ~(allocate_size - 1);
+
+
+	temp_addr = mmap(NULL, 2*allocate_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_SHARED, 0, 0);			// allocate 1 page for each object size
+	new_pageblock = (pageblock_t *) ( (((unsigned long)temp_addr) & page_block_mask)+ allocate_size );
+
+	unsigned long temp_size =  ((unsigned long)new_pageblock) - ((unsigned long)temp_addr) ;
+	munmap(temp_addr, temp_size );
+	temp_size =  (((unsigned long)temp_addr) + 2*allocate_size) - ( ((unsigned long)new_pageblock) + allocate_size ) ;
+	munmap( (void *) ( ((unsigned long)new_pageblock) + allocate_size ) , temp_size );
+
 
 	new_pageblock->id = 0;
 	new_pageblock->pageblock_size = allocate_size;
 	new_pageblock->object_size = size;
 
 	new_pageblock->unallocated = (void *) (( ((unsigned long) new_pageblock) + sizeof(pageblock_t) + mask ) & (~mask) );
-	printf("unallocated: %p,%p ~~~~ %d \n", new_pageblock->unallocated, new_pageblock, sizeof(pageblock_t));
+	printf("~~~~~~ new_pageblock: %p\n", new_pageblock);
 
 	new_pageblock->num_free_objects =  (unsigned) ((((unsigned long) new_pageblock) + allocate_size) - ((unsigned long) new_pageblock->unallocated)) / size;
 	
 
-	new_pageblock->remotely_freed_list = (void *) queue_create();
-	new_pageblock->freed_list = (void *) queue_create();
+	new_pageblock->remotely_freed_list.next = NULL;
+	new_pageblock->freed_list.next = NULL;
 
 	if(mem.obj[position].active_tail != NULL){
 		new_pageblock->prev = mem.obj[position].active_tail->prev;
@@ -64,16 +74,6 @@ void allocate_memory(size_t size){
 	}
 
 	new_pageblock->heap = (local_heap_t *) &(mem.obj[position]);
-
-	// if(table[position] == NULL){
-	// 	table[position] = queue_create();
-	// }
-	// void *temp_addr = (void *) new_pageblock;
-	// for(int i=0; i < allocate_size; i += PAGE){
-	// 	enqueue_head(table[position], temp_addr);
-	// 	// printf("==== %p\n",temp_addr );
-	// 	temp_addr = (void *) (((unsigned long) temp_addr) + PAGE);
-	// }
 }
 
 void *my_malloc(size_t size){									// function used by users
@@ -90,7 +90,7 @@ void *my_malloc(size_t size){									// function used by users
 		allocate_memory(object_size);
 		position = get_object_class(object_size);
 	}
-	address = dequeue_head( (queue_t *) mem.obj[position].active_tail->freed_list);
+	address = (void *) unstack( (node_t *) &mem.obj[position].active_tail->freed_list );
 	if( address != NULL ){					// get from superblock
 		printf("GOT FROM FREE LIST\n");
 		return address;
@@ -114,9 +114,7 @@ int my_free(void *address){
 	mask = ~(PAGEBLOCK_SIZE - 1);
 	my_pageblock = (pageblock_t *) (mask & ((unsigned long)address));
 
-	printf("my_pageblock = %p , address = %p\n",my_pageblock,address );
-
-	// enqueue_head(my_pageblock->freed_list, address);
+	stack( (node_t *) &(my_pageblock->freed_list), (node_t *) address);
 	
 	printf("inserted to free %p\n", address);
 

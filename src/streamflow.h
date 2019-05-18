@@ -32,15 +32,14 @@ struct pageblock {
 	unsigned pageblock_size;
 	unsigned object_size;
 	unsigned num_free_objects;
-	void *freed_list;				// start of free list
+	node_t freed_list;				// start of free list
 	void *unallocated;				// points to the next unallocated space within a pageblock
-	void *remotely_freed_list;
+	node_t remotely_freed_list;
 	struct pageblock *next;
 	struct pageblock *prev;
 	struct local_heap *heap;
 };
 
-extern queue_t *table[9];
 
 typedef struct object_class object_class_t;
 typedef struct local_heap local_heap_t;
