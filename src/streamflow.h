@@ -9,7 +9,7 @@
 #include <string.h>
 #include "queue.h"
 
-#define OBJECT_CLASS 8
+#define OBJECT_CLASS 9
 #define PAGE sysconf(_SC_PAGE_SIZE)
 #define PAGEBLOCK_SIZE PAGE*8
 #define CACHE_LINE sysconf(_SC_LEVEL1_DCACHE_LINESIZE)
@@ -40,7 +40,7 @@ struct pageblock {
 	struct local_heap *heap;
 };
 
-extern queue_t *table[8];
+extern queue_t *table[9];
 
 typedef struct object_class object_class_t;
 typedef struct local_heap local_heap_t;
