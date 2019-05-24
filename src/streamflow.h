@@ -28,16 +28,19 @@ struct local_heap {
 };
 
 struct pageblock {
-	int id;
+	struct object_class *id;
 	unsigned pageblock_size;
 	unsigned object_size;
-	unsigned num_free_objects;
+	unsigned num_unalloc_objs;		// num of objects that are not used
+	unsigned num_alloc_objs;		// num of objects that used 
+	unsigned num_freed_objs;		// num of objects that freed (not remotely)
+	unsigned max_objs;
 	node_t freed_list;				// start of free list
 	void *unallocated;				// points to the next unallocated space within a pageblock
 	node_t remotely_freed_list;
 	struct pageblock *next;
 	struct pageblock *prev;
-	struct local_heap *heap;
+	struct object_class *heap;
 };
 
 

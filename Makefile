@@ -14,15 +14,29 @@ OPTFLAGS = -O3
 SRC = src
 OBJ = obj
 
-SOURCES = $(wildcard $(SRC)/*.c)
+SOURCES = $(SRC)/lock.c $(SRC)/queue.c $(SRC)/streamflow.c
 OBJECTS = $(patsubst $(SRC)/%.c,$(OBJ)/%.o,$(SOURCES))
-main: $(OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LFLAGS)
+EXEC = $()
+
+all: main checkUnusedPageblocks
+
+main: $(OBJECTS) $(OBJ)/main.o
+	$(CC) $(CFLAGS) $(SOURCES) $(SRC)/main.c -o $@ $(LFLAGS)
+
+checkUnusedPageblocks: $(OBJECTS) $(OBJ)/checkUnusedPageblocks.o
+	$(CC) $(CFLAGS) $(SOURCES) $(SRC)/checkUnusedPageblocks.c -o $@ $(LFLAGS)
 
 $(OBJ)/%.o: $(SRC)/%.c
 	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS)
 
+#main.o: $(SRC)/main.c
+#	$(CC) -c $(CFLAGS) $< -o %(OBJ)/$@
+
+#checkUnusedPageblocks.o: $(SRC)/checkUnusedPageblocks.c
+#	$(CC) -c $(CFLAGS) $< -o %(OBJ)/$@
+
 .PHONY: clean
 # Cleans the executable and the object files
 clean:
-	$(RM) main $(OBJECTS)
+	$(RM) -r obj main checkUnusedPageblocks
+	mkdir obj

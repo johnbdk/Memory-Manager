@@ -27,7 +27,7 @@ int main(int argc, char* argv[]){
 	printf("%d, %d --- %p\n", ad[0], ad[1], ad );
 
 	// printf("\nCheck sizes that is not power of 2.\n");
-	char *str = (char*) my_malloc(57*sizeof(char)); //57 bytes -> slot 3
+	char *str = (char*) my_malloc(150*sizeof(char)); //57 bytes -> slot 3
 	memcpy(str, "boo", 3);
 
 	printf("%s\n", str);
