@@ -38,7 +38,7 @@ int object_class_exists(size_t size){			// if objects of this size already exist
 
 	position = get_object_class(size);
 
-	if(mem.obj[position].active_head == NULL){
+	if(mem.obj[position].active_tail == NULL){
 		return -1;
 	}
 
@@ -87,23 +87,28 @@ void allocate_memory(size_t size){
 	new_pageblock->max_objs = new_pageblock->num_unalloc_objs;
 	new_pageblock->num_freed_objs = 0;
 	new_pageblock->num_alloc_objs = 0;
+	new_pageblock->sloppy_counter = 0;
 
 	new_pageblock->remotely_freed_list.next = NULL;
 	new_pageblock->freed_list.next = NULL;
 
-	if(mem.obj[position].active_tail != NULL){
-		new_pageblock->prev = mem.obj[position].active_tail;//->prev;
-		new_pageblock->next = mem.obj[position].active_tail->next;
-		mem.obj[position].active_tail->next->prev = new_pageblock;
-		mem.obj[position].active_tail->next = new_pageblock;
-		mem.obj[position].active_tail = new_pageblock;
+	if(mem.obj[position].active_head != NULL){
+		mem.obj[position].active_tail = mem.obj[position].active_head;
+
+		new_pageblock->prev = mem.obj[position].active_head;//->prev;
+		new_pageblock->next = mem.obj[position].active_head->next;
+
+		mem.obj[position].active_head->next->prev = new_pageblock;
+		mem.obj[position].active_head->next = new_pageblock;
+
+		mem.obj[position].active_head = new_pageblock;
 	}
 	else{
 		new_pageblock->prev = new_pageblock;
 		new_pageblock->next = new_pageblock;
 
-		mem.obj[position].active_tail = new_pageblock;
 		mem.obj[position].active_head = new_pageblock;
+		mem.obj[position].active_tail = new_pageblock;
 	}
 
 	new_pageblock->heap = (object_class_t *) &(mem.obj[position]);
@@ -118,27 +123,53 @@ void *my_malloc(size_t size){									// function used by users
 	// printf("size of alloc: %zu, next pow of 2: %zu\n", size, object_size);
 	//printf("%zu\n", object_size);
 	position = object_class_exists(object_size);
-	if( position == -1 || mem.obj[position].active_tail->num_unalloc_objs == 0 ){
+	if( position == -1 ){
+		allocate_memory(object_size);
+		position = get_object_class(object_size);
+
+		printf("GOT FROM SUPERBLOCK\n");
+		address = mem.obj[position].active_head->unallocated;
+		mem.obj[position].active_head->unallocated = (void *) (((unsigned long) mem.obj[position].active_head->unallocated) + object_size);
+		mem.obj[position].active_head->num_unalloc_objs--;
+		mem.obj[position].active_head->num_alloc_objs++;
+	}
+	else if( mem.obj[position].active_head->num_freed_objs != 0 ){
+		address = (void *) unstack( (node_t *) &mem.obj[position].active_head->freed_list );
+		mem.obj[position].active_head->num_freed_objs--;
+	}
+	else{
+		node_t *addrs;
+		addrs = (node_t *) atomic_unstack( (node_t *) &mem.obj[position].active_head->remotely_freed_list );
+		if(addrs == NULL){
+			if( mem.obj[position].active_head->num_unalloc_objs == 0){
+				allocate_memory(object_size);
+				position = get_object_class(object_size);
+			}
+			printf("GOT FROM SUPERBLOCK\n");
+			address = mem.obj[position].active_head->unallocated;
+			mem.obj[position].active_head->unallocated = (void *) (((unsigned long) mem.obj[position].active_head->unallocated) + object_size);
+			mem.obj[position].active_head->num_unalloc_objs--;
+			mem.obj[position].active_head->num_alloc_objs++;
+		}
+		else{
+			address = (void *) addrs;
+			for(node_t *curr = addrs->next; curr != NULL; curr = curr->next){
+				printf("%p\n",curr );
+				stack( (node_t *) &(mem.obj[position].active_head->freed_list), curr);
+				mem.obj[position].active_head->num_freed_objs++;
+			}
+		}
+	}
+	if( position == -1 || mem.obj[position].active_head->num_unalloc_objs == 0 ){
 		printf("allocate_memory call\n");
 		allocate_memory(object_size);
 		position = get_object_class(object_size);
 	}
-	address = (void *) unstack( (node_t *) &mem.obj[position].active_tail->freed_list );
+	
 	if( address != NULL ) {					// get from superblock
 		printf("GOT FROM FREE LIST\n");
-		mem.obj[position].active_tail->num_freed_objs--;
-		return address;
+		
 	}
-
-	else {							// get from free list
-		printf("GOT FROM SUPERBLOCK\n");
-		address = mem.obj[position].active_tail->unallocated;
-		mem.obj[position].active_tail->unallocated = (void *) (((unsigned long) mem.obj[position].active_tail->unallocated) + object_size);
-		mem.obj[position].active_tail->num_unalloc_objs--;
-		mem.obj[position].active_tail->num_alloc_objs++;
-	}
-
-				// MUST CHECK IF THERE IS NO ITEM IN FREE LIST AND NO OTHER MEMORY IN SUPERBLOCK
 
 	return address;
 }
@@ -153,44 +184,59 @@ int my_free(void *address){
 	if (my_pageblock->id == &(mem.obj[0])) {
 		stack( (node_t *) &(my_pageblock->freed_list), (node_t *) address);
 		printf("inserted to free %p\n", address);
-		my_pageblock->num_freed_objs ++;
+		(my_pageblock->num_freed_objs)++;
 
-		// to do: change the condition (depends on remote free list objects)
-		if (my_pageblock->num_freed_objs == my_pageblock->num_alloc_objs) {
-			pageblock_t *start = my_pageblock;
-			pageblock_t *curr = start->next;
-			while(curr != start) {
-				unsigned unused_objs = curr->num_unalloc_objs + curr->num_freed_objs;
-				if (unused_objs >= curr->max_objs/2) {
-					//to do: check the number of remoted free objects
-
-					// remove start from pageblock list
-					start->prev->next = start->next;
-					start->next->prev = start->prev;
-
-					// insert it to caches_pageBlock list
-					push(start);
-
-					// set curr node as the tail pageblock
-					curr->prev->next = curr->next;
-					curr->next->prev = curr->prev;
-
-					curr->next = my_pageblock->heap->active_tail->next;
-					my_pageblock->heap->active_tail->next->prev = curr;
-					curr->prev = my_pageblock->heap->active_tail;
-					my_pageblock->heap->active_tail->next = curr;
-					my_pageblock->heap->active_tail = curr;
-
-					printf("SAVE CACHE PAGEBLOCK FROM A SUPERBLOCK\n");
-					break;
+		/* if freed objects are less than the allocated objects, then take from remotely_freed_list based on a threshold & sloppy_counter */
+		if (my_pageblock->num_freed_objs <  my_pageblock->num_alloc_objs) {
+			float threshold = 0.8;
+			if (my_pageblock->sloppy_counter > threshold*(my_pageblock->num_alloc_objs - my_pageblock->num_freed_objs)) {
+				node_t *addrs;
+				addrs = (node_t *) atomic_unstack( (node_t *) &(my_pageblock->heap->active_head->remotely_freed_list) );
+				my_pageblock->sloppy_counter = 0;
+				if (addrs != NULL) {
+					printf("PASSED THE THRESHOLD AND ATOMIC READ THE REMOTELY FREED LIST\n");
+					for(node_t *curr = addrs->next; curr != NULL; curr = curr->next){
+						stack( (node_t *) &(my_pageblock->heap->active_head->freed_list), curr);
+						my_pageblock->heap->active_head->num_freed_objs++;
+					}
 				}
-				curr = curr->next;
+			}
+		}
+
+		/* if freed objects are equal to the allocated objects, then check if page block must be chached */
+		if (my_pageblock->num_freed_objs == my_pageblock->num_alloc_objs) {
+			unsigned neighbor_unused_objs;
+			unsigned max_objs;
+			if (my_pageblock == my_pageblock->heap->active_head) {			// if pageblock is head
+				neighbor_unused_objs = my_pageblock->next->num_unalloc_objs + my_pageblock->next->num_freed_objs;
+				max_objs = my_pageblock->next->max_objs;
+			}
+			else{															// if not head
+				neighbor_unused_objs = my_pageblock->heap->active_head->num_unalloc_objs + my_pageblock->heap->active_head->num_freed_objs;
+				max_objs = my_pageblock->heap->active_head->max_objs;
+			}
+
+			if (neighbor_unused_objs >= max_objs/2) {
+
+				my_pageblock->prev->next = my_pageblock->next;				// change my neighbours' pointers
+				my_pageblock->next->prev = my_pageblock->prev;
+
+				if (my_pageblock == my_pageblock->heap->active_head) {		// if head make something else new head
+					my_pageblock->heap->active_head = my_pageblock->next;
+				}
+				if (my_pageblock == my_pageblock->heap->active_tail) {		// if tail make something else new tail
+					my_pageblock->heap->active_tail = my_pageblock->prev;
+				}
+
+				push(my_pageblock);
+				printf("SAVE CACHE PAGEBLOCK FROM A SUPERBLOCK\n");
 			}
 		}
 		
 	}
 	else {
-		//to do: atomic operations stack
+		atomic_stack( (node_t *) &(my_pageblock->remotely_freed_list), (node_t *) address);
+		(my_pageblock->sloppy_counter)++;
 		printf("inserted to remote free %p\n", address);
 	}
 

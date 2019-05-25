@@ -21,7 +21,7 @@ EXEC = $()
 all: main checkUnusedPageblocks
 
 main: $(OBJECTS) $(OBJ)/main.o
-	$(CC) $(CFLAGS) $(SOURCES) $(SRC)/main.c -o $@ $(LFLAGS)
+	$(CC) $(CFLAGS) $(SOURCES) $(SRC)/main.c -o $@ $(LFLAGS) -lpthread
 
 checkUnusedPageblocks: $(OBJECTS) $(OBJ)/checkUnusedPageblocks.o
 	$(CC) $(CFLAGS) $(SOURCES) $(SRC)/checkUnusedPageblocks.c -o $@ $(LFLAGS)

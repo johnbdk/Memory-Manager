@@ -35,6 +35,7 @@ struct pageblock {
 	unsigned num_alloc_objs;		// num of objects that used 
 	unsigned num_freed_objs;		// num of objects that freed (not remotely)
 	unsigned max_objs;
+	unsigned sloppy_counter;
 	node_t freed_list;				// start of free list
 	void *unallocated;				// points to the next unallocated space within a pageblock
 	node_t remotely_freed_list;
