@@ -1,4 +1,4 @@
-#include "streamflow.h"
+#include "../src/streamflow.h"
 
 int main(int argc, char* argv[]){
 	int *ad[4*1024];

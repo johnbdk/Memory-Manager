@@ -13,30 +13,29 @@ OPTFLAGS = -O3
 # Directories
 SRC = src
 OBJ = obj
+TST = tests
+ROOT = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 
-SOURCES = $(SRC)/lock.c $(SRC)/queue.c $(SRC)/streamflow.c
+SOURCES = $(wildcard $(SRC)/*.c)
 OBJECTS = $(patsubst $(SRC)/%.c,$(OBJ)/%.o,$(SOURCES))
-EXEC = $()
+TESTS = $(wildcard $(TST)/*.c)
+TEST_OBJ = $(patsubst $(TST)/%.c,$(OBJ)/%.o,$(TESTS))
+EXEC = $(patsubst $(TST)/%.c, %, $(TESTS))
 
-all: main checkUnusedPageblocks
 
-main: $(OBJECTS) $(OBJ)/main.o
-	$(CC) $(CFLAGS) $(SOURCES) $(SRC)/main.c -o $@ $(LFLAGS) -lpthread
+all: $(OBJECTS) $(EXEC)
 
-checkUnusedPageblocks: $(OBJECTS) $(OBJ)/checkUnusedPageblocks.o
-	$(CC) $(CFLAGS) $(SOURCES) $(SRC)/checkUnusedPageblocks.c -o $@ $(LFLAGS)
+$(EXEC): % : $(OBJECTS) $(TEST_OBJ) 
+	$(CC) $(CFLAGS) $(SOURCES) $(TST)/$@.c -o $@ $(LFLAGS) -lpthread
+
+$(TEST_OBJ): $(OBJ)/%.o : $(TST)/%.c
+	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS)
 
 $(OBJ)/%.o: $(SRC)/%.c
 	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS)
 
-#main.o: $(SRC)/main.c
-#	$(CC) -c $(CFLAGS) $< -o %(OBJ)/$@
-
-#checkUnusedPageblocks.o: $(SRC)/checkUnusedPageblocks.c
-#	$(CC) -c $(CFLAGS) $< -o %(OBJ)/$@
-
 .PHONY: clean
 # Cleans the executable and the object files
 clean:
-	$(RM) -r obj main checkUnusedPageblocks
+	$(RM) -r obj $(EXEC)
 	mkdir obj

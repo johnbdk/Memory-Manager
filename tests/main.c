@@ -1,4 +1,4 @@
-#include "streamflow.h"
+#include "../src/streamflow.h"
 #include <pthread.h>
 
 void *job(){
@@ -8,7 +8,7 @@ void *job(){
 	srand(time(NULL));
 
 	for(int i=0; i<2000; i++){
-		random = rand()%2048;
+		random = (rand() + 1)%2049;
 		ad = (char *) my_malloc(random*sizeof(char));
 	}
 
