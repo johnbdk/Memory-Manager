@@ -6,6 +6,8 @@ __thread local_heap_t mem = {{{NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, N
 
 pageblock_t *cached_pageblock = NULL;
 
+const int slots[OBJECT_CLASS] = {8, 16, 32, 64, 128, 256, 512, 1024, 2048}; 
+
 void push(pageblock_t *node) {
 	node->next = cached_pageblock;
 	node->prev = NULL;
@@ -24,12 +26,35 @@ pageblock_t* pop() {
 	return node;
 }
 
+int binary_search(int start, int end, int value, int *pos) {
+	int index;
+
+	index = (end-start) / 2;
+	index += start;
+
+	if(end == 0) {
+		if (pos != NULL)
+			*pos = 0;
+		return slots[0];
+	}
+
+	if ((slots[index] <= value) && (slots[index-1] < value)) {
+		if (pos != NULL)
+			*pos = index;
+		return slots[index];
+	}
+	else if (slots[index] < value) {
+		return binary_search(index+1, end, value, pos);
+	}
+	else {
+		return binary_search(start, index-1, value, pos);
+	}
+}
+
 int get_object_class(size_t size){					// returns the position in array that the objects of a specific size should be placed
 	int position;								// size 8 -> position 0, size 16 -> position 1, ...
 
-	position = (int) (log(max(size,8))/log(2)); // todo change
-	position -= 3;
-	//printf("size = %d: position = %d\n", size, position);
+	binary_search(0, OBJECT_CLASS, size, &position);
 	return position;
 }
 
@@ -119,7 +144,7 @@ void *my_malloc(size_t size){									// function used by users
 	void *address;
 	int position;
 
-	object_size = (int) pow(2, ceil(log(size)/log(2))); // todo change
+	object_size = binary_search(0, OBJECT_CLASS, size, NULL);
 	// printf("size of alloc: %zu, next pow of 2: %zu\n", size, object_size);
 	//printf("%zu\n", object_size);
 	position = object_class_exists(object_size);
