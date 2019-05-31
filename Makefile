@@ -10,6 +10,8 @@ LFLAGS = -lm
 # Compile with -O3 optimization
 OPTFLAGS = -O3
 
+DFLAGS = -Dmalloc=my_malloc -Dfree=my_free
+
 # Directories
 SRC = src
 OBJ = obj
@@ -26,7 +28,7 @@ EXEC = $(patsubst $(TST)/%.c, %, $(TESTS))
 all: $(OBJECTS) $(EXEC)
 
 $(EXEC): % : $(OBJECTS) $(TEST_OBJ) 
-	$(CC) $(CFLAGS) $(SOURCES) $(TST)/$@.c -o $@ $(LFLAGS) -lpthread
+	$(CC) $(CFLAGS) $(SOURCES) $(TST)/$@.c -o $@ $(LFLAGS) $(DFLAGS) -lpthread
 
 $(TEST_OBJ): $(OBJ)/%.o : $(TST)/%.c
 	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS)

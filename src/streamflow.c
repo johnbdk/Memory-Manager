@@ -1,6 +1,5 @@
 #include "streamflow.h"
 
-
 __thread local_heap_t mem = {{{NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL},
 					{NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL}}};
 
@@ -32,13 +31,19 @@ int get_slot(int start, int end, int value, int *pos) {
 	index = (end-start) / 2;
 	index += start;
 
+	if (value > 2048) {
+		if (pos != NULL)
+			*pos = -1;
+		return -1;
+	}
+
 	if(end == 0) {
 		if (pos != NULL)
 			*pos = 0;
 		return slots[0];
 	}
 
-	if ((slots[index] <= value) && (slots[index-1] < value)) {
+	if ((slots[index] >= value) && (slots[index-1] < value)) {
 		if (pos != NULL)
 			*pos = index;
 		return slots[index];
@@ -51,31 +56,31 @@ int get_slot(int start, int end, int value, int *pos) {
 	}
 }
 
-int get_object_class(size_t size){					// returns the position in array that the objects of a specific size should be placed
-	int position;								// size 8 -> position 0, size 16 -> position 1, ...
+int get_object_class(size_t size) {					// returns the position in array that the objects of a specific size should be placed
+	int position;									// size 8 -> position 0, size 16 -> position 1, ...
 
 	get_slot(0, OBJECT_CLASS, size, &position);
 	return position;
 }
 
-int object_class_exists(size_t size){			// if objects of this size already exist (there is already a slot in the array)
+int object_class_exists(size_t size) {				// if objects of this size already exist (there is already a slot in the array)
 	int position;
 
 	position = get_object_class(size);
 
-	if(mem.obj[position].active_tail == NULL){
+	if(mem.obj[position].active_tail == NULL) {
 		return -1;
 	}
 
 	return position;
 }
 
-void allocate_memory(size_t size){	
+void allocate_memory(size_t size) {	
 	int position = get_object_class(size);
 	pageblock_t *new_pageblock;
 	void *temp_addr;
 	unsigned long mask = 15;
-	int allocate_size = PAGEBLOCK_SIZE;			// this will be replaced with more clever logic
+	int allocate_size = PAGEBLOCK_SIZE;				// this will be replaced with more clever logic
 
 	unsigned long page_block_mask = ~(allocate_size - 1);
 
@@ -85,12 +90,12 @@ void allocate_memory(size_t size){
 		fflush(stdout);
 	}
 	else {
-		temp_addr = mmap(NULL, 2*allocate_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_SHARED, 0, 0);			// allocate 1 page for each object size
+		temp_addr = mmap(NULL, 2*allocate_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_SHARED, 0, 0);		// allocate 1 page for each object size
 		new_pageblock = (pageblock_t *) ( (((unsigned long)temp_addr) & page_block_mask)+ allocate_size );
 
 		unsigned long temp_size =  ((unsigned long)new_pageblock) - ((unsigned long)temp_addr) ;
 		if (temp_size != allocate_size) {
-			munmap(temp_addr, temp_size );
+			munmap(temp_addr, temp_size);
 			temp_size =  (((unsigned long)temp_addr) + 2*allocate_size) - ( ((unsigned long)new_pageblock) + allocate_size ) ;
 			munmap( (void *) ( ((unsigned long)new_pageblock) + allocate_size ) , temp_size );
 		}
@@ -122,7 +127,7 @@ void allocate_memory(size_t size){
 	if(mem.obj[position].active_head != NULL){
 		mem.obj[position].active_tail = mem.obj[position].active_head;
 
-		new_pageblock->prev = mem.obj[position].active_head;//->prev;
+		new_pageblock->prev = mem.obj[position].active_head;
 		new_pageblock->next = mem.obj[position].active_head->next;
 
 		mem.obj[position].active_head->next->prev = new_pageblock;
@@ -141,15 +146,21 @@ void allocate_memory(size_t size){
 	new_pageblock->heap = (object_class_t *) &(mem.obj[position]);
 }
 
-void *my_malloc(size_t size){									// function used by users
+void *my_malloc(size_t size) {
 	size_t object_size;
 	void *address;
 	int position;
 
 	object_size = get_slot(0, OBJECT_CLASS, size, NULL);
-	// printf("size of alloc: %zu, next pow of 2: %zu\n", size, object_size);
-	//printf("%zu\n", object_size);
+	/* Allocate memory for large objects */
+	if (object_size == -1) {
+		printf("LARGE OBJECT\n");
+		address = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_SHARED, 0, 0);
+		return address; 
+	}
+
 	position = object_class_exists(object_size);
+
 	if( position == -1 ){
 		allocate_memory(object_size);
 		position = get_object_class(object_size);
@@ -196,7 +207,8 @@ void *my_malloc(size_t size){									// function used by users
 		position = get_object_class(object_size);
 	}
 	
-	if( address != NULL ) {					// get from superblock
+	/* Get from superblock */
+	if( address != NULL ) {
 		printf("GOT FROM FREE LIST\n");
 		
 	}
@@ -204,7 +216,7 @@ void *my_malloc(size_t size){									// function used by users
 	return address;
 }
 
-int my_free(void *address){
+void my_free(void *address){
 	unsigned long mask;
 	pageblock_t *my_pageblock;
 
@@ -240,11 +252,11 @@ int my_free(void *address){
 		if (my_pageblock->num_freed_objs == my_pageblock->num_alloc_objs) {
 			unsigned neighbor_unused_objs;
 			unsigned max_objs;
-			if (my_pageblock == my_pageblock->heap->active_head) {			// if pageblock is head
+			if (my_pageblock == my_pageblock->heap->active_head) {	// if pageblock is head
 				neighbor_unused_objs = my_pageblock->next->num_unalloc_objs + my_pageblock->next->num_freed_objs;
 				max_objs = my_pageblock->next->max_objs;
 			}
-			else{															// if not head
+			else{	// if not head
 				neighbor_unused_objs = my_pageblock->heap->active_head->num_unalloc_objs + my_pageblock->heap->active_head->num_freed_objs;
 				max_objs = my_pageblock->heap->active_head->max_objs;
 			}
@@ -274,7 +286,4 @@ int my_free(void *address){
 		printf("inserted to remote free %p\n", address);
 		fflush(stdout);
 	}
-
-	//printf("my_free:\n\tslot = %d, numOf8B = %d\n", i, numOf8B);
-	return 0;
 }

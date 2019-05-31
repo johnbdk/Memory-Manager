@@ -1,4 +1,6 @@
 *.pdf
 .tags*
-main
 *.o
+main
+check_unused_pageblocks
+test_remotefree
