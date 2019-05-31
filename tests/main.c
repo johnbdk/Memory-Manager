@@ -51,18 +51,11 @@ void *job3() {
 }
 
 void *job4() {
-	int *ad[2000];
+	int *ad;
 
-	for(int i=0; i<6000; i++){
-		if (i < 2000) {
-			ad[i] = (int *) malloc(20*sizeof(int));
-		}
-		else if (i < 4000) {
-			free((void *) ad[i-2000]);
-		}
-		else{
-			ad[i-4000] = (int *) malloc(20*sizeof(int));
-		}
+	for(int i=0; i<100; i++){
+		ad = (int *) malloc(5000);
+		free(ad);
 	}
 
 	return NULL;

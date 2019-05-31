@@ -7,6 +7,8 @@ __thread pageblock_t *cached_pageblock = NULL;
 
 const int slots[OBJECT_CLASS] = {8, 16, 32, 64, 128, 256, 512, 1024, 2048}; 
 
+char magic_number[72] = "Themanagementoflargeobjectsissignificantlysimplerthanthatofsmallobjects.";
+
 void push(pageblock_t *node) {
 	node->next = cached_pageblock;
 	node->prev = NULL;
@@ -155,8 +157,15 @@ void *my_malloc(size_t size) {
 	/* Allocate memory for large objects */
 	if (object_size == -1) {
 		printf("LARGE OBJECT\n");
-		address = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_SHARED, 0, 0);
-		return address; 
+		address = mmap(NULL, size+sizeof(magic_number)+sizeof(unsigned long), PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_SHARED, 0, 0);
+
+		unsigned long mmap_size = (unsigned long) ((size/PAGE) + 1)*4096;
+		
+		memcpy(address, (void *) &mmap_size, sizeof(unsigned long));
+		memcpy((void *) (((unsigned long) address) + sizeof(unsigned long)), (void *) magic_number, sizeof(magic_number));
+		void *ret_address = (void *) (((unsigned long) address) + sizeof(magic_number) + sizeof(unsigned long));
+
+		return ret_address; 
 	}
 
 	position = object_class_exists(object_size);
@@ -219,6 +228,20 @@ void *my_malloc(size_t size) {
 void my_free(void *address){
 	unsigned long mask;
 	pageblock_t *my_pageblock;
+	char is_it_magic[72];
+
+	memcpy((void *) is_it_magic, (void *) (((unsigned long) address) - sizeof(magic_number)), sizeof(magic_number) );
+	
+	if ( memcmp( (void *) magic_number, (void *) is_it_magic, sizeof(magic_number)) == 0 ) {
+		unsigned long mmap_size;
+		printf("LARGE OBJECT FREE\n");
+
+		mmap_size = *((unsigned long *) (((unsigned long) address) - sizeof(magic_number) - sizeof(unsigned long)));
+
+		munmap((void *) (((unsigned long) address) - sizeof(magic_number) - sizeof(unsigned long)), mmap_size);
+
+		return;
+	}
 
 	mask = ~(PAGEBLOCK_SIZE - 1);
 	my_pageblock = (pageblock_t *) (mask & ((unsigned long)address));
