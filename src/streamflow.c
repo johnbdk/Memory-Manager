@@ -1,7 +1,7 @@
 #include "streamflow.h"
 
 __thread local_heap_t mem = {{{NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL},
-					{NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL}}};
+					{NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL}}};
 
 __thread pageblock_t *cached_pageblock = NULL;
 
@@ -262,11 +262,13 @@ void my_free(void *address){
 				if (addrs != NULL) {
 					printf("PASSED THE THRESHOLD AND ATOMIC READ THE REMOTELY FREED LIST\n");
 					fflush(stdout);
-
+					int counter = 0;
 					for(node_t *curr = addrs->next; curr != NULL; curr = curr->next){
+						counter++;
 						stack( (node_t *) &(my_pageblock->heap->active_head->freed_list), curr);
 						my_pageblock->heap->active_head->num_freed_objs++;
 					}
+					printf("COUNTER IS %d\n", counter);
 				}
 			}
 		}

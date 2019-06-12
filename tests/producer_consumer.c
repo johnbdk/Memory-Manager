@@ -33,7 +33,7 @@ void *producer()
         	
     	lock_release(&b[i].lock);
     }
-
+    return NULL;
 }
 
 void *consumer()
@@ -58,6 +58,7 @@ void *consumer()
         printf("CONSUMER: freed slot %d\n", i);
 		fflush(stdout);		
 	}
+    return NULL;
 }
 
 int main(int argc, char* argv[]){
