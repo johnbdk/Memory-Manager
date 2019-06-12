@@ -1,8 +1,8 @@
 #include "../src/streamflow.h"
 #include <pthread.h>
 
-int *ad[10000];
-volatile int counter;
+double *ad[10000];
+volatile int counter = 0;
 int *ad2[10000];
 volatile int counter2;
 
@@ -14,12 +14,13 @@ void *job() {
 
 	for(int i=0; i<10000; i++){
 		random = 100;//(rand() + 1)%2048;
-		ad[i] = (int *) malloc(random*sizeof(char));
+		ad[i] = malloc(random*sizeof(double));
 		counter++;
 		if(i == 1000 || i == 3000){
 			sleep(0.5);
 		}
 	}
+	while(counter != 0);
 	for(int i=5000; i<10000; i++){
 		free((void *) ad[i]);
 	}
@@ -31,18 +32,18 @@ void *job2() {
 	int i=0;
 
 	while(i < 5000){
-		while(i >= counter);
+		while(counter <5000);
 
 		printf("will free small\n");
 		fflush(stdout);
 		free((void *) ad[i]);
 		i++;
 		
-		if( i == 2500){
-			sleep(0.5);
-		}
+		// if( i == 2500){
+		// 	sleep(0.5);
+		// }
 	}
-
+	counter = 0;
 	return NULL;
 }
 

@@ -7,7 +7,7 @@ __thread pageblock_t *cached_pageblock = NULL;
 
 const int slots[OBJECT_CLASS] = {8, 16, 32, 64, 128, 256, 512, 1024, 2048}; 
 
-char magic_number[72] = "Themanagementoflargeobjectsissignificantlysimplerthanthatofsmallobjects.";
+char magic_number[72] = "Themanagementoflargeobjectsissignificantlysimplerthanthatofsmallobjects";
 
 void push(pageblock_t *node) {
 	node->next = cached_pageblock;
@@ -88,8 +88,8 @@ void allocate_memory(size_t size) {
 
 	new_pageblock = pop();
 	if (new_pageblock != NULL) {
-		printf("GET FROM CACHED LIST\n");
-		fflush(stdout);
+		//printf("GET FROM CACHED LIST\n");
+		//fflush(stdout);
 	}
 	else {
 		temp_addr = mmap(NULL, 2*allocate_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_SHARED, 0, 0);		// allocate 1 page for each object size
@@ -102,8 +102,8 @@ void allocate_memory(size_t size) {
 			munmap( (void *) ( ((unsigned long)new_pageblock) + allocate_size ) , temp_size );
 		}
 		else {
-			printf("SAVE CACHE PAGEBLOCK\n");
-			fflush(stdout);
+			//printf("SAVE CACHE PAGEBLOCK\n");
+			//fflush(stdout);
 			push((pageblock_t *)temp_addr);
 		}
 	}
@@ -114,8 +114,8 @@ void allocate_memory(size_t size) {
 	new_pageblock->object_size = size;
 
 	new_pageblock->unallocated = (void *) (( ((unsigned long) new_pageblock) + sizeof(pageblock_t) + mask ) & (~mask) );
-	printf("~~~~~~ new_pageblock: %p\n", new_pageblock);
-	fflush(stdout);
+	//printf("~~~~~~ new_pageblock: %p\n", new_pageblock);
+	//fflush(stdout);
 
 	new_pageblock->num_unalloc_objs =  (unsigned) ((((unsigned long) new_pageblock) + allocate_size) - ((unsigned long) new_pageblock->unallocated)) / size;
 	new_pageblock->max_objs = new_pageblock->num_unalloc_objs;
@@ -156,7 +156,7 @@ void *my_malloc(size_t size) {
 	object_size = get_slot(0, OBJECT_CLASS, size, NULL);
 	/* Allocate memory for large objects */
 	if (object_size == -1) {
-		printf("LARGE OBJECT\n");
+		//printf("LARGE OBJECT\n");
 		address = mmap(NULL, size+sizeof(magic_number)+sizeof(unsigned long), PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_SHARED, 0, 0);
 
 		unsigned long mmap_size = (unsigned long) ((size/PAGE) + 1)*4096;
@@ -174,8 +174,8 @@ void *my_malloc(size_t size) {
 		allocate_memory(object_size);
 		position = get_object_class(object_size);
 
-		printf("GOT FROM SUPERBLOCK\n");
-		fflush(stdout);
+		//printf("GOT FROM SUPERBLOCK\n");
+		//fflush(stdout);
 		address = mem.obj[position].active_head->unallocated;
 		mem.obj[position].active_head->unallocated = (void *) (((unsigned long) mem.obj[position].active_head->unallocated) + object_size);
 		mem.obj[position].active_head->num_unalloc_objs--;
@@ -193,8 +193,8 @@ void *my_malloc(size_t size) {
 				allocate_memory(object_size);
 				position = get_object_class(object_size);
 			}
-			printf("GOT FROM SUPERBLOCK\n");
-			fflush(stdout);
+			//printf("GOT FROM SUPERBLOCK\n");
+			//fflush(stdout);
 			address = mem.obj[position].active_head->unallocated;
 			mem.obj[position].active_head->unallocated = (void *) (((unsigned long) mem.obj[position].active_head->unallocated) + object_size);
 			mem.obj[position].active_head->num_unalloc_objs--;
@@ -203,22 +203,22 @@ void *my_malloc(size_t size) {
 		else{
 			address = (void *) addrs;
 			for(node_t *curr = addrs->next; curr != NULL; curr = curr->next){
-				printf("%p\n",curr );
+				//printf("%p\n",curr );
 				stack( (node_t *) &(mem.obj[position].active_head->freed_list), curr);
 				mem.obj[position].active_head->num_freed_objs++;
 			}
 		}
 	}
 	if( position == -1 || mem.obj[position].active_head->num_unalloc_objs == 0 ){
-		printf("allocate_memory call\n");
-		fflush(stdout);
+		//printf("allocate_memory call\n");
+		//fflush(stdout);
 		allocate_memory(object_size);
 		position = get_object_class(object_size);
 	}
 	
 	/* Get from superblock */
 	if( address != NULL ) {
-		printf("GOT FROM FREE LIST\n");
+		//printf("GOT FROM FREE LIST\n");
 		
 	}
 
@@ -234,7 +234,8 @@ void my_free(void *address){
 	
 	if ( memcmp( (void *) magic_number, (void *) is_it_magic, sizeof(magic_number)) == 0 ) {
 		unsigned long mmap_size;
-		printf("LARGE OBJECT FREE\n");
+		//printf("LARGE OBJECT FREE\n");
+		//fflush(stdout);
 
 		mmap_size = *((unsigned long *) (((unsigned long) address) - sizeof(magic_number) - sizeof(unsigned long)));
 
@@ -248,27 +249,36 @@ void my_free(void *address){
 
 	if (my_pageblock->id == &(mem.obj[0])) {
 		stack( (node_t *) &(my_pageblock->freed_list), (node_t *) address);
-		printf("inserted to free %p\n", address);
-		fflush(stdout);
+		//printf("inserted to free %p\n", address);
+		//fflush(stdout);
 		(my_pageblock->num_freed_objs)++;
 
 		/* if freed objects are less than the allocated objects, then take from remotely_freed_list based on a threshold & sloppy_counter */
 		if (my_pageblock->num_freed_objs <  my_pageblock->num_alloc_objs) {
-			float threshold = 0.8;
+			float threshold = 0;
 			if (my_pageblock->sloppy_counter > threshold*(my_pageblock->num_alloc_objs - my_pageblock->num_freed_objs)) {
 				node_t *addrs;
-				addrs = (node_t *) atomic_unstack( (node_t *) &(my_pageblock->heap->active_head->remotely_freed_list) );
+				addrs = (node_t *) atomic_unstack( (node_t *) &(my_pageblock->remotely_freed_list) );
+				//printf("assumed rem_freed object are %d\n", my_pageblock->sloppy_counter);
+				//fflush(stdout);
 				my_pageblock->sloppy_counter = 0;
 				if (addrs != NULL) {
-					printf("PASSED THE THRESHOLD AND ATOMIC READ THE REMOTELY FREED LIST\n");
-					fflush(stdout);
+					//printf("PASSED THE THRESHOLD AND ATOMIC READ THE REMOTELY FREED LIST\n");
+					//fflush(stdout);
 					int counter = 0;
-					for(node_t *curr = addrs->next; curr != NULL; curr = curr->next){
+					node_t * curr, *temp;
+					for(curr = addrs, temp = addrs->next; curr != NULL; ) {
 						counter++;
 						stack( (node_t *) &(my_pageblock->heap->active_head->freed_list), curr);
 						my_pageblock->heap->active_head->num_freed_objs++;
+						
+						curr = temp;
+						if (temp != NULL) {
+							temp = temp->next;
+						}
 					}
-					printf("COUNTER IS %d\n", counter);
+					//printf("COUNTER IS %d\n", counter);
+					//fflush(stdout);
 				}
 			}
 		}
@@ -299,8 +309,8 @@ void my_free(void *address){
 				}
 
 				push(my_pageblock);
-				printf("SAVE CACHE PAGEBLOCK FROM A SUPERBLOCK\n");
-				fflush(stdout);
+				//printf("SAVE CACHE PAGEBLOCK FROM A SUPERBLOCK\n");
+				//fflush(stdout);
 			}
 		}
 		
@@ -308,7 +318,7 @@ void my_free(void *address){
 	else {
 		atomic_stack( (node_t *) &(my_pageblock->remotely_freed_list), (node_t *) address);
 		(my_pageblock->sloppy_counter)++;
-		printf("inserted to remote free %p\n", address);
-		fflush(stdout);
+		//printf("inserted to remote free %p\n", address);
+		//fflush(stdout);
 	}
 }
