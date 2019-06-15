@@ -77,7 +77,7 @@ int object_class_exists(size_t size) {				// if objects of this size already exi
 	return position;
 }
 
-void allocate_memory(size_t size) {	
+int allocate_memory(size_t size) {	
 	int position = get_object_class(size);
 	pageblock_t *new_pageblock;
 	void *temp_addr;
@@ -93,6 +93,9 @@ void allocate_memory(size_t size) {
 	}
 	else {
 		temp_addr = mmap(NULL, 2*allocate_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_SHARED, 0, 0);		// allocate 1 page for each object size
+		if (temp_addr == NULL) {
+			return -1;
+		}
 		new_pageblock = (pageblock_t *) ( (((unsigned long)temp_addr) & page_block_mask)+ allocate_size );
 
 		unsigned long temp_size =  ((unsigned long)new_pageblock) - ((unsigned long)temp_addr) ;
@@ -106,6 +109,8 @@ void allocate_memory(size_t size) {
 			//fflush(stdout);
 			push((pageblock_t *)temp_addr);
 		}
+
+		return 1;
 	}
 	
 
@@ -152,12 +157,16 @@ void *my_malloc(size_t size) {
 	size_t object_size;
 	void *address;
 	int position;
+	int ret_val;
 
 	object_size = get_slot(0, OBJECT_CLASS, size, NULL);
 	/* Allocate memory for large objects */
 	if (object_size == -1) {
 		//printf("LARGE OBJECT\n");
 		address = mmap(NULL, size+sizeof(magic_number)+sizeof(unsigned long), PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_SHARED, 0, 0);
+		if (address == NULL) {
+			return NULL;
+		}
 
 		unsigned long mmap_size = (unsigned long) ((size/PAGE) + 1)*4096;
 		
@@ -171,7 +180,10 @@ void *my_malloc(size_t size) {
 	position = object_class_exists(object_size);
 
 	if( position == -1 ){
-		allocate_memory(object_size);
+		ret_val = allocate_memory(object_size);
+		if (ret_val == -1) {
+			return NULL;
+		}
 		position = get_object_class(object_size);
 
 		//printf("GOT FROM SUPERBLOCK\n");
@@ -190,7 +202,10 @@ void *my_malloc(size_t size) {
 		addrs = (node_t *) atomic_unstack( (node_t *) &mem.obj[position].active_head->remotely_freed_list );
 		if(addrs == NULL){
 			if( mem.obj[position].active_head->num_unalloc_objs == 0){
-				allocate_memory(object_size);
+				ret_val = allocate_memory(object_size);
+				if (ret_val == -1) {
+					return NULL;
+				}
 				position = get_object_class(object_size);
 			}
 			//printf("GOT FROM SUPERBLOCK\n");
@@ -212,7 +227,10 @@ void *my_malloc(size_t size) {
 	if( position == -1 || mem.obj[position].active_head->num_unalloc_objs == 0 ){
 		//printf("allocate_memory call\n");
 		//fflush(stdout);
-		allocate_memory(object_size);
+		ret_val = allocate_memory(object_size);
+		if (ret_val == -1) {
+			return NULL;
+		}
 		position = get_object_class(object_size);
 	}
 	
@@ -255,7 +273,7 @@ void my_free(void *address){
 
 		/* if freed objects are less than the allocated objects, then take from remotely_freed_list based on a threshold & sloppy_counter */
 		if (my_pageblock->num_freed_objs <  my_pageblock->num_alloc_objs) {
-			float threshold = 0;
+			float threshold = 0.8;
 			if (my_pageblock->sloppy_counter > threshold*(my_pageblock->num_alloc_objs - my_pageblock->num_freed_objs)) {
 				node_t *addrs;
 				addrs = (node_t *) atomic_unstack( (node_t *) &(my_pageblock->remotely_freed_list) );

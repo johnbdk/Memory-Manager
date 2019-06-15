@@ -52,6 +52,6 @@ int get_object_class(size_t obj_size);
 int object_class_exists(size_t obj_size);
 void my_free(void *address);
 void *my_malloc(size_t size);
-void allocate_memory(size_t obj_size);
+int allocate_memory(size_t obj_size);
 
 #endif
