@@ -1,12 +1,12 @@
 #include "../src/streamflow.h"
 
 int main(int argc, char* argv[]){
-	int *ad[4*1024];
+	int *ad[4 * 1024];
 	int *ad2;
 
 	// void *temp_addr = (void *) (mask & ((unsigned long)&address));
-	for (int i = 0; i < 4*1024; i++) {
-		ad[i] = (int *) malloc(2*sizeof(int)); //8 bytes -> slot 0
+	for (int i = 0; i < (4 * 1024); i++) {
+		ad[i] = (int *) malloc(2 * sizeof(int)); //8 bytes -> slot 0
 		ad[i][0] = 99;
 		ad[i][1] = 782;
 		fflush(stdout);
@@ -23,11 +23,11 @@ int main(int argc, char* argv[]){
 
 	printf("free()\n");
 	fflush(stdout);
-	for(int i = 0; i < 4*1024; i++)
+	for(int i = 0; i < (4 * 1024); i++)
 		free((void *) ad[i]);
 
 	printf("reallocate\n");
-	for (int i = 0; i < 4*1024; i++) {
+	for (int i = 0; i < (4 * 1024); i++) {
 		ad[i] = (int *) malloc(2*sizeof(int)); //8 bytes -> slot 0
 		ad[i][0] = 99;
 		ad[i][1] = 782;

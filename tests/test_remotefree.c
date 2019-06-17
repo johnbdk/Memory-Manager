@@ -8,9 +8,9 @@ void *job1() {
 
 	srand(time(NULL));
 
-	for(int i=0; i<2000; i++) {
+	for(int i = 0; i < 2000; i++) {
 		printf("T-1: ");
-		ad1 = (char *) malloc(120*sizeof(char));
+		ad1 = (char *) malloc(120 * sizeof(char));
 		ad1[0] = 1;
 	}
 
@@ -25,16 +25,16 @@ void *job1() {
 
 void *job2() {
 	
-	for(int i=0; i<6000; i++){
+	for(int i = 0; i < 6000; i++) {
 		if (i < 2000) {
 			printf("T-2: ");
-			ad2[i] = (int *) malloc(2*sizeof(int));
+			ad2[i] = (int *) malloc( 2 *sizeof(int));
 			ad2[i][0] = 2;
 		}
 		else if (i < 4000) {
-			if (i-2000 != 0) {
-				printf("T-2: free [%d] ", i-2000);
-				free((void *) ad2[i-2000]);
+			if ((i - 2000) != 0) {
+				printf("T-2: free [%d] ", i - 2000);
+				free((void *) ad2[i - 2000]);
 			}
 			else {
 				printf("T-2: start freeing\n");
@@ -50,6 +50,7 @@ void *job2() {
 
 int main(int argc, char* argv[]){
 	pthread_t x, y;
+	
 	pthread_create(&x, NULL, job1, NULL);
 	pthread_create(&y, NULL, job2, NULL);
 

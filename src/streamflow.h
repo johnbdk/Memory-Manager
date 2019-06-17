@@ -48,10 +48,13 @@ typedef struct object_class object_class_t;
 typedef struct local_heap local_heap_t;
 typedef struct pageblock pageblock_t;
 
+pageblock_t* pop_cached_pb();
+int allocate_memory(size_t obj_size);
 int get_object_class(size_t obj_size);
 int object_class_exists(size_t obj_size);
-void my_free(void *address);
+int get_slot(int start, int end, int value, int *pos);
 void *my_malloc(size_t size);
-int allocate_memory(size_t obj_size);
+void push_cached_pb(pageblock_t *node);
+void my_free(void *address);
 
 #endif

@@ -14,8 +14,8 @@ typedef struct {
 buffer_t b[SLOTS];
 int slot_sz[SLOTS] = {8, 16, 32, 64, 128, 256, 512, 1024, 2048};
 
-void *producer()
-{
+void *producer() {
+
     for (int i = 0; i < SLOTS; i++) {
 
     	printf("PRODUCER: slot %d\n", i);
@@ -25,24 +25,23 @@ void *producer()
     	fflush(stdout);
 
     	for (int j = 0; j < ELEMS; j++) {
-    		b[i].buf[j] = (char*)malloc(slot_sz[i]*sizeof(char));
+    		b[i].buf[j] = (char *) malloc(slot_sz[i] * sizeof(char));
     		b[i].occupied++;
     	}
     	printf("PRODUCER: allocated slot %d\n", i);
 		fflush(stdout);
-        	
     	lock_release(&b[i].lock);
     }
     return NULL;
 }
 
-void *consumer()
-{
+void *consumer() {
+
     for (int i = 0; i < SLOTS; i++) {
-    	if(b[i].occupied != ELEMS) {
+    	if (b[i].occupied != ELEMS) {
     		printf("CONSUMER: locked slot %d\n", i);
     		fflush(stdout);
-    		while(!b[i].occupied);
+    		while (!b[i].occupied);
         	lock_acquire(&b[i].lock);
 	    	printf("%d\n", i);
 	    	fflush(stdout);
@@ -61,7 +60,7 @@ void *consumer()
     return NULL;
 }
 
-int main(int argc, char* argv[]){
+int main(int argc, char* argv[]) {
 	pthread_t x, y;
 
 	for (int i = 0; i < SLOTS; i++) {
@@ -71,7 +70,7 @@ int main(int argc, char* argv[]){
 
 	pthread_create(&x, NULL, producer, NULL);
 	pthread_create(&y, NULL, consumer, NULL);
-
+    
 	pthread_join(x, NULL);
 	pthread_join(y, NULL);
 	return 0;
