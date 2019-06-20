@@ -95,7 +95,7 @@ int allocate_memory(size_t size) {
 	if (new_pageblock == NULL) {
 		/* allocate 1 page for each object size */
 		temp_addr = mmap(NULL, 2 * allocate_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-		if (temp_addr == NULL) {
+		if (temp_addr == MAP_FAILED) {
 			return -1;
 		}
 
@@ -153,19 +153,26 @@ void *my_malloc(size_t size) {
 
 	object_size = get_slot(0, OBJECT_CLASS, size, NULL);
 	/* Allocate memory for large objects */
+	printf("1\n");
 	if (object_size == -1) {
 		//printf("LARGE OBJECT\n");
 		address = mmap(NULL, size + sizeof(magic_number) + sizeof(unsigned long), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-		if (address == NULL) {
+		printf("1.1 %p\n", address);
+		if (address == MAP_FAILED) {
+			printf("1.2\n");
 			return NULL;
 		}
 		unsigned long mmap_size = (unsigned long) (((size / PAGE) + 1) * 4096);
+		printf("1.3\n");
 		memcpy(address, (void *) &mmap_size, sizeof(unsigned long));
+		printf("1.4\n");
 		memcpy((void *) (((unsigned long) address) + sizeof(unsigned long)), (void *) magic_number, sizeof(magic_number));
+		printf("1.5\n");
 		void *ret_address = (void *) (((unsigned long) address) + sizeof(magic_number) + sizeof(unsigned long));
+		printf("1.6\n");
 		return ret_address; 
 	}
-
+	printf("2\n");
 	position = object_class_exists(object_size);
 	if (position == -1 ) {
 		ret_val = allocate_memory(object_size);
@@ -213,6 +220,7 @@ void *my_malloc(size_t size) {
 			}
 		}
 	}
+	printf("3\n");
 
 	if (position == -1 || mem.obj[position].active_head->num_unalloc_objs == 0) {
 		//printf("allocate_memory call\n");
