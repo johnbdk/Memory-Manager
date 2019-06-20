@@ -10,7 +10,11 @@ LFLAGS = -lm
 # Compile with -O3 optimization
 OPTFLAGS = -O3
 
+# Rename my_malloc / my_free to malloc / free
 DFLAGS = -Dmalloc=my_malloc -Dfree=my_free
+
+# Comment this to remove code for metrics
+DBGFLAGS = -DMETRICS
 
 # Directories
 SRC = src
@@ -28,13 +32,13 @@ EXEC = $(patsubst $(TST)/%.c, %, $(TESTS))
 all: $(OBJECTS) $(EXEC)
 
 $(EXEC): % : $(OBJECTS) $(TEST_OBJ) 
-	$(CC) $(CFLAGS) $(SOURCES) $(TST)/$@.c -o $@ $(LFLAGS) $(DFLAGS) -lpthread
+	$(CC) $(CFLAGS) $(SOURCES) $(TST)/$@.c -o $@ $(LFLAGS) $(DFLAGS) $(DBGFLAGS) -lpthread
 
 $(TEST_OBJ): $(OBJ)/%.o : $(TST)/%.c
-	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS)
+	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS) $(DBGFLAGS)
 
 $(OBJ)/%.o: $(SRC)/%.c
-	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS)
+	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS) $(DBGFLAGS)
 
 .PHONY: clean
 # Cleans the executable and the object files

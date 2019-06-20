@@ -9,6 +9,7 @@
 #include <string.h>
 #include "queue.h"
 
+#define MAX_CACHED_PB 10
 #define OBJECT_CLASS 9
 #define PAGE sysconf(_SC_PAGE_SIZE)
 #define PAGEBLOCK_SIZE PAGE*8
@@ -30,7 +31,7 @@ struct local_heap {
 struct pageblock {
 	struct object_class *id;
 	unsigned pageblock_size;
-	unsigned object_size;
+	long object_size;
 	unsigned num_unalloc_objs;		// num of objects that are not used
 	unsigned num_alloc_objs;		// num of objects that used 
 	unsigned num_freed_objs;		// num of objects that freed (not remotely)

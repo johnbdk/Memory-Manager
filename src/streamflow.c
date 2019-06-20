@@ -2,18 +2,23 @@
 
 __thread local_heap_t mem = {{{NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL},
 					{NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL}}};
-
 __thread pageblock_t *cached_pageblock = NULL;
-
 const int slots[OBJECT_CLASS] = {8, 16, 32, 64, 128, 256, 512, 1024, 2048}; 
-
 char magic_number[72] = "Themanagementoflargeobjectsissignificantlysimplerthanthatofsmallobjects";
+int no_cached_pb = 0;
+
+#ifdef METRICS
+long object_metric = 0;
+double mmap_metric = 0;
+unsigned long long seq = 0;
+#endif
 
 void push_cached_pb(pageblock_t *node) {
 
 	node->next = cached_pageblock;
 	node->prev = NULL;
 	cached_pageblock = node;
+	no_cached_pb++;
 }
 
 pageblock_t* pop_cached_pb() {
@@ -28,6 +33,7 @@ pageblock_t* pop_cached_pb() {
 	if (cached_pageblock != NULL) {
 		cached_pageblock->prev = NULL;
 	}
+	no_cached_pb--;
 	return curr_node;
 }
 
@@ -98,18 +104,35 @@ int allocate_memory(size_t size) {
 		if (temp_addr == MAP_FAILED) {
 			return -1;
 		}
+#ifdef METRICS
+		mmap_metric += allocate_size;
+#endif
 
 		new_pageblock = (pageblock_t *) ((((unsigned long) temp_addr) & page_block_mask) + allocate_size);
-		unsigned long temp_size = ((unsigned long) new_pageblock) - ((unsigned long) temp_addr);
-		if (temp_size != allocate_size) {
-			munmap(temp_addr, temp_size);
-			temp_size =  (((unsigned long) temp_addr) + (2 * allocate_size)) - (((unsigned long) new_pageblock) + allocate_size);
-			munmap((void *) (((unsigned long) new_pageblock) + allocate_size) , temp_size);
+		unsigned long temp_size_1, temp_size_2;
+		temp_size_1 = ((unsigned long) new_pageblock) - ((unsigned long) temp_addr);
+		if (temp_size_1 != allocate_size) {
+			munmap(temp_addr, temp_size_1);
+			temp_size_2 =  (((unsigned long) temp_addr) + (2 * allocate_size)) - (((unsigned long) new_pageblock) + allocate_size);
+			munmap((void *) (((unsigned long) new_pageblock) + allocate_size) , temp_size_2);
+#ifdef METRICS
+			mmap_metric -= temp_size_1 + temp_size_2;
+#endif
 		}
 		else {
-			//printf("SAVE CACHE PAGEBLOCK\n");
-			//fflush(stdout);
-			push_cached_pb((pageblock_t *)temp_addr);
+			/* If we have free slots in cache */
+			if (no_cached_pb < MAX_CACHED_PB) {
+				//printf("SAVE CACHE PAGEBLOCK\n");
+				//fflush(stdout);
+				push_cached_pb((pageblock_t *) temp_addr);
+			}
+			/* Cache is full, return address to OS */
+			else {
+				munmap((void *) (pageblock_t *) temp_addr, PAGEBLOCK_SIZE);
+#ifdef METRICS
+				mmap_metric -= PAGEBLOCK_SIZE;
+#endif
+			}
 		}
 	}
 
@@ -153,26 +176,20 @@ void *my_malloc(size_t size) {
 
 	object_size = get_slot(0, OBJECT_CLASS, size, NULL);
 	/* Allocate memory for large objects */
-	printf("1\n");
 	if (object_size == -1) {
 		//printf("LARGE OBJECT\n");
+		/* Doesn't need to add metrics to large objects, is 1-to-1 */
 		address = mmap(NULL, size + sizeof(magic_number) + sizeof(unsigned long), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-		printf("1.1 %p\n", address);
 		if (address == MAP_FAILED) {
-			printf("1.2\n");
 			return NULL;
 		}
 		unsigned long mmap_size = (unsigned long) (((size / PAGE) + 1) * 4096);
-		printf("1.3\n");
 		memcpy(address, (void *) &mmap_size, sizeof(unsigned long));
-		printf("1.4\n");
 		memcpy((void *) (((unsigned long) address) + sizeof(unsigned long)), (void *) magic_number, sizeof(magic_number));
-		printf("1.5\n");
 		void *ret_address = (void *) (((unsigned long) address) + sizeof(magic_number) + sizeof(unsigned long));
-		printf("1.6\n");
 		return ret_address; 
 	}
-	printf("2\n");
+
 	position = object_class_exists(object_size);
 	if (position == -1 ) {
 		ret_val = allocate_memory(object_size);
@@ -220,7 +237,6 @@ void *my_malloc(size_t size) {
 			}
 		}
 	}
-	printf("3\n");
 
 	if (position == -1 || mem.obj[position].active_head->num_unalloc_objs == 0) {
 		//printf("allocate_memory call\n");
@@ -236,6 +252,17 @@ void *my_malloc(size_t size) {
 	if (address != NULL) {
 		//printf("GOT FROM FREE LIST\n");
 	}
+
+	/* Metrics for small objects */
+#ifdef METRICS
+	object_metric += object_size;
+	seq++;
+	// fprintf(stderr, "***************************************************\n");
+	fprintf(stderr, "SEQ %llu, MMAP Bytes:\t%.2lf\tObject Bytes: %ld\n", seq, mmap_metric, object_metric);
+	fprintf(stderr, "SEQ %llu, RATIO (MMAP/Objects):\t%lf\n\n", seq, (double) (mmap_metric / object_metric));
+	// fprintf(stderr, "***************************************************\n\n");
+	fflush(stderr);
+#endif
 	return address;
 }
 
@@ -286,7 +313,7 @@ void my_free(void *address){
 			}
 		}
 
-		/* if freed objects are equal to the allocated objects, then check if page block must be chached */
+		/* if freed objects are equal to the allocated objects, then check if page block must be cached */
 		if (my_pageblock->num_freed_objs == my_pageblock->num_alloc_objs) {
 			unsigned neighbor_unused_objs;
 			unsigned max_objs;
@@ -310,9 +337,20 @@ void my_free(void *address){
 				if (my_pageblock == my_pageblock->heap->active_tail) {		// if tail make something else new tail
 					my_pageblock->heap->active_tail = my_pageblock->prev;
 				}
-				push_cached_pb(my_pageblock);
-				//printf("SAVE CACHE PAGEBLOCK FROM A SUPERBLOCK\n");
-				//fflush(stdout);
+
+				/* If we have free slots in cache */
+				if (no_cached_pb < MAX_CACHED_PB) {
+					push_cached_pb(my_pageblock);
+					//printf("SAVE CACHE PAGEBLOCK FROM A SUPERBLOCK\n");
+					//fflush(stdout);
+				}
+				/* Cache is full, return address to OS */
+				else {
+					munmap((void *) my_pageblock, PAGEBLOCK_SIZE);
+#ifdef METRICS
+					mmap_metric -= PAGEBLOCK_SIZE;		
+#endif
+				}
 			}
 		}
 	}
@@ -322,4 +360,8 @@ void my_free(void *address){
 		//printf("inserted to remote free %p\n", address);
 		//fflush(stdout);
 	}
+#ifdef METRICS
+
+	__sync_fetch_and_add(&object_metric, -my_pageblock->object_size);
+#endif
 }
