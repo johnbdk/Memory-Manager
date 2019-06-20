@@ -7,3 +7,4 @@ test_remotefree
 producer_consumer
 remote_unstack
 tradeoff
+stress
