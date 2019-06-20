@@ -14,7 +14,10 @@ OPTFLAGS = -O3
 DFLAGS = -Dmalloc=my_malloc -Dfree=my_free
 
 # Comment this to remove code for metrics
-DBGFLAGS = -DMETRICS
+DMETRICSFLAGS = #-DMETRICS
+
+# Comment this to remove code for debug prints
+DBGMETRICS = #-DDBUG
 
 # Directories
 SRC = src
@@ -32,13 +35,13 @@ EXEC = $(patsubst $(TST)/%.c, %, $(TESTS))
 all: $(OBJECTS) $(EXEC)
 
 $(EXEC): % : $(OBJECTS) $(TEST_OBJ) 
-	$(CC) $(CFLAGS) $(SOURCES) $(TST)/$@.c -o $@ $(LFLAGS) $(DFLAGS) $(DBGFLAGS) -lpthread
+	$(CC) $(CFLAGS) $(SOURCES) $(TST)/$@.c -o $@ $(LFLAGS) $(DFLAGS) $(DMETRICSFLAGS) $(DBGMETRICS) -lpthread
 
 $(TEST_OBJ): $(OBJ)/%.o : $(TST)/%.c
-	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS) $(DBGFLAGS)
+	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS) $(DMETRICSFLAGS) $(DBGMETRICS)
 
 $(OBJ)/%.o: $(SRC)/%.c
-	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS) $(DBGFLAGS)
+	$(CC) $(CFLAGS) -I$(SRC) -c $< -o $@ $(LFLAGS) $(DMETRICSFLAGS) $(DBGMETRICS)
 
 .PHONY: clean
 # Cleans the executable and the object files

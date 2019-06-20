@@ -1,11 +1,12 @@
 #include "streamflow.h"
 
+__thread pageblock_t *cached_pageblock = NULL;
 __thread local_heap_t mem = {{{NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL},
 					{NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL}, {NULL, NULL}}};
-__thread pageblock_t *cached_pageblock = NULL;
+					
 const int slots[OBJECT_CLASS] = {8, 16, 32, 64, 128, 256, 512, 1024, 2048}; 
-char magic_number[72] = "Themanagementoflargeobjectsissignificantlysimplerthanthatofsmallobjects";
 int no_cached_pb = 0;
+char magic_number[72] = "Themanagementoflargeobjectsissignificantlysimplerthanthatofsmallobjects";
 
 #ifdef METRICS
 long object_metric = 0;
@@ -122,8 +123,10 @@ int allocate_memory(size_t size) {
 		else {
 			/* If we have free slots in cache */
 			if (no_cached_pb < MAX_CACHED_PB) {
-				//printf("SAVE CACHE PAGEBLOCK\n");
-				//fflush(stdout);
+#ifdef DBUG
+				printf("SAVE CACHE PAGEBLOCK\n");
+				fflush(stdout);
+#endif
 				push_cached_pb((pageblock_t *) temp_addr);
 			}
 			/* Cache is full, return address to OS */
@@ -147,8 +150,10 @@ int allocate_memory(size_t size) {
 	new_pageblock->max_objs = new_pageblock->num_unalloc_objs;
 	new_pageblock->unallocated = (void *) ((((unsigned long) new_pageblock) + sizeof(pageblock_t) + mask) & (~mask));
 	new_pageblock->num_unalloc_objs = (unsigned) ((((unsigned long) new_pageblock) + allocate_size) - ((unsigned long) new_pageblock->unallocated)) / size;
-	//printf("~~~~~~ new_pageblock: %p\n", new_pageblock);
-	//fflush(stdout);
+#ifdef DBUG
+	printf("~~~~~~ new_pageblock: %p\n", new_pageblock);
+	fflush(stdout);
+#endif
 
 	if (mem.obj[position].active_head != NULL) {
 		mem.obj[position].active_tail = mem.obj[position].active_head;
@@ -177,7 +182,10 @@ void *my_malloc(size_t size) {
 	object_size = get_slot(0, OBJECT_CLASS, size, NULL);
 	/* Allocate memory for large objects */
 	if (object_size == -1) {
-		//printf("LARGE OBJECT\n");
+#ifdef DBUG
+		printf("LARGE OBJECT\n");
+		fflush(stdout);
+#endif
 		/* Doesn't need to add metrics to large objects, is 1-to-1 */
 		address = mmap(NULL, size + sizeof(magic_number) + sizeof(unsigned long), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
 		if (address == MAP_FAILED) {
@@ -197,9 +205,10 @@ void *my_malloc(size_t size) {
 			return NULL;
 		}
 		position = get_object_class(object_size);
-
-		//printf("GOT FROM SUPERBLOCK\n");
-		//fflush(stdout);
+#ifdef DBUG
+		printf("GOT FROM SUPERBLOCK\n");
+		fflush(stdout);
+#endif
 		address = mem.obj[position].active_head->unallocated;
 		mem.obj[position].active_head->unallocated = (void *) (((unsigned long) mem.obj[position].active_head->unallocated) + object_size);
 		mem.obj[position].active_head->num_unalloc_objs--;
@@ -221,8 +230,10 @@ void *my_malloc(size_t size) {
 				}
 				position = get_object_class(object_size);
 			}
-			//printf("GOT FROM SUPERBLOCK\n");
-			//fflush(stdout);
+#ifdef DBUG
+			printf("GOT FROM SUPERBLOCK\n");
+			fflush(stdout);
+#endif
 			address = mem.obj[position].active_head->unallocated;
 			mem.obj[position].active_head->unallocated = (void *) (((unsigned long) mem.obj[position].active_head->unallocated) + object_size);
 			mem.obj[position].active_head->num_unalloc_objs--;
@@ -231,7 +242,6 @@ void *my_malloc(size_t size) {
 		else {
 			address = (void *) addrs;
 			for (node_t *curr = addrs->next; curr != NULL; curr = curr->next) {
-				//printf("%p\n",curr );
 				stack( (node_t *) &(mem.obj[position].active_head->freed_list), curr);
 				mem.obj[position].active_head->num_freed_objs++;
 			}
@@ -239,20 +249,24 @@ void *my_malloc(size_t size) {
 	}
 
 	if (position == -1 || mem.obj[position].active_head->num_unalloc_objs == 0) {
-		//printf("allocate_memory call\n");
-		//fflush(stdout);
+#ifdef DBUG
+		printf("Allocate_memory call\n");
+		fflush(stdout);
+#endif
 		ret_val = allocate_memory(object_size);
 		if (ret_val == -1) {
 			return NULL;
 		}
 		position = get_object_class(object_size);
 	}
-	
+
+#ifdef DBUG	
 	/* Get from superblock */
 	if (address != NULL) {
-		//printf("GOT FROM FREE LIST\n");
+		printf("GOT FROM FREE LIST\n");
+		fflush(stdout);
 	}
-
+#endif
 	/* Metrics for small objects */
 #ifdef METRICS
 	object_metric += object_size;
@@ -275,8 +289,10 @@ void my_free(void *address){
 	
 	if (memcmp((void *) magic_number, (void *) is_it_magic, sizeof(magic_number)) == 0) {
 		unsigned long mmap_size;
-		//printf("LARGE OBJECT FREE\n");
-		//fflush(stdout);
+#ifdef DBUG
+		printf("LARGE OBJECT FREE\n");
+		fflush(stdout);
+#endif
 		mmap_size = *((unsigned long *) (((unsigned long) address) - sizeof(magic_number) - sizeof(unsigned long)));
 		munmap((void *) (((unsigned long) address) - sizeof(magic_number) - sizeof(unsigned long)), mmap_size);
 		return;
@@ -287,8 +303,10 @@ void my_free(void *address){
 
 	if (my_pageblock->id == &(mem.obj[0])) {
 		stack( (node_t *) &(my_pageblock->freed_list), (node_t *) address);
-		//printf("inserted to free %p\n", address);
-		//fflush(stdout);
+#ifdef DBUG
+		printf("inserted to free %p\n", address);
+		fflush(stdout);
+#endif
 		(my_pageblock->num_freed_objs)++;
 
 		/* if freed objects are less than the allocated objects, then take from remotely_freed_list based on a threshold & sloppy_counter */
@@ -341,14 +359,20 @@ void my_free(void *address){
 				/* If we have free slots in cache */
 				if (no_cached_pb < MAX_CACHED_PB) {
 					push_cached_pb(my_pageblock);
-					//printf("SAVE CACHE PAGEBLOCK FROM A SUPERBLOCK\n");
-					//fflush(stdout);
+#ifdef DBUG
+					printf("SAVE CACHE PAGEBLOCK FROM A SUPERBLOCK\n");
+					fflush(stdout);
+#endif
 				}
 				/* Cache is full, return address to OS */
 				else {
 					munmap((void *) my_pageblock, PAGEBLOCK_SIZE);
 #ifdef METRICS
 					mmap_metric -= PAGEBLOCK_SIZE;		
+#endif
+#ifdef DBUG
+					printf("UNMMAP PAGEBLOCK FROM A SUPERBLOCK, CACHE IS FULL\n");
+					fflush(stdout);
 #endif
 				}
 			}
@@ -357,11 +381,13 @@ void my_free(void *address){
 	else {
 		atomic_stack((node_t *) &(my_pageblock->remotely_freed_list), (node_t *) address);
 		(my_pageblock->sloppy_counter)++;
-		//printf("inserted to remote free %p\n", address);
-		//fflush(stdout);
+#ifdef DBUG
+		printf("Inserted to remote free %p\n", address);
+		fflush(stdout);
+#endif
 	}
-#ifdef METRICS
 
+#ifdef METRICS
 	__sync_fetch_and_add(&object_metric, -my_pageblock->object_size);
 #endif
 }
