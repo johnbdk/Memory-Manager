@@ -1,0 +1,61 @@
+************************************************
+
+Object size 16, #Cores 2
+
+	malloc			my_malloc
+	0m5,273s		0m5,204s
+	0m4,885s		0m4,521s
+	0m5,401s		0m4,793s
+	0m5,083s		0m5,437s
+	0m4,203s		0m4,752s
+
+Object size 16, #Cores 4
+
+	malloc			my_malloc
+	0m6,899s		0m6,973s
+	0m6,942s		0m6,940s
+	0m6,960s		0m7,088s
+	0m6,941s		0m6,977s
+	0m6,934s		0m7,072s
+
+Object size 16, #Cores 8
+
+	malloc			my_malloc
+	0m15,048s		0m15,239s
+	0m15,088s		0m15,677s
+	0m15,251s		0m15,232s
+	0m15,046s		0m14,681s
+	0m15,332s		0m14,987s
+
+************************************************
+
+Object size 128, #Cores 2
+
+	malloc			my_malloc
+	0m4,261s		0m3,955s
+	0m4,349s		0m4,462s
+	0m3,570s		0m4,102s
+	0m5,001s		0m3,754s
+	0m4,336s		0m4,592s
+
+Object size 128, #Cores 4
+
+	malloc			my_malloc
+	0m7,163s		0m7,225s
+	0m6,809s		0m7,262s
+	0m7,059s		0m7,124s
+	0m7,104s		0m7,294s
+	0m7,189s		0m7,147s
+
+Object size 128, #Cores 8
+
+	malloc			my_malloc
+	0m16,060s		0m15,996s
+	0m15,941s		0m16,098s
+	0m16,043s		0m16,029s
+	0m16,040s		0m16,195s
+	0m15,966s		0m16,125s
+
+
+
+

@@ -10,7 +10,7 @@ char magic_number[72] = "Themanagementoflargeobjectsissignificantlysimplerthanth
 
 #ifdef METRICS
 long object_metric = 0;
-double mmap_metric = 0;
+long mmap_metric = 0;
 unsigned long long seq = 0;
 #endif
 
@@ -106,7 +106,7 @@ int allocate_memory(size_t size) {
 			return -1;
 		}
 #ifdef METRICS
-		mmap_metric += allocate_size;
+		__sync_fetch_and_add(&mmap_metric, 2*allocate_size);
 #endif
 
 		new_pageblock = (pageblock_t *) ((((unsigned long) temp_addr) & page_block_mask) + allocate_size);
@@ -117,7 +117,7 @@ int allocate_memory(size_t size) {
 			temp_size_2 =  (((unsigned long) temp_addr) + (2 * allocate_size)) - (((unsigned long) new_pageblock) + allocate_size);
 			munmap((void *) (((unsigned long) new_pageblock) + allocate_size) , temp_size_2);
 #ifdef METRICS
-			mmap_metric -= temp_size_1 + temp_size_2;
+			__sync_fetch_and_sub(&mmap_metric, temp_size_1 + temp_size_2);
 #endif
 		}
 		else {
@@ -133,7 +133,7 @@ int allocate_memory(size_t size) {
 			else {
 				munmap((void *) (pageblock_t *) temp_addr, PAGEBLOCK_SIZE);
 #ifdef METRICS
-				mmap_metric -= PAGEBLOCK_SIZE;
+				__sync_fetch_and_sub(&mmap_metric, PAGEBLOCK_SIZE);
 #endif
 			}
 		}
@@ -269,11 +269,14 @@ void *my_malloc(size_t size) {
 #endif
 	/* Metrics for small objects */
 #ifdef METRICS
-	object_metric += object_size;
+	__sync_fetch_and_add(&object_metric, object_size);
 	seq++;
 	// fprintf(stderr, "***************************************************\n");
-	fprintf(stderr, "SEQ %llu, MMAP Bytes:\t%.2lf\tObject Bytes: %ld\n", seq, mmap_metric, object_metric);
-	fprintf(stderr, "SEQ %llu, RATIO (MMAP/Objects):\t%lf\n\n", seq, (double) (mmap_metric / object_metric));
+	// fprintf(stderr, "SEQ %llu, MMAP Bytes:\t%.2lf\tObject Bytes: %ld\n", seq, mmap_metric, object_metric);
+	// fprintf(stderr, "SEQ %llu, RATIO (MMAP/Objects):\t%lf\n\n", seq, (double) (mmap_metric / object_metric));
+	fprintf(stderr, "%ld, %ld, %lf\n", mmap_metric, object_metric,  ((double)mmap_metric / (double)object_metric));
+	fflush(stderr);
+
 	// fprintf(stderr, "***************************************************\n\n");
 	fflush(stderr);
 #endif
@@ -368,7 +371,7 @@ void my_free(void *address){
 				else {
 					munmap((void *) my_pageblock, PAGEBLOCK_SIZE);
 #ifdef METRICS
-					mmap_metric -= PAGEBLOCK_SIZE;		
+					__sync_fetch_and_sub(&mmap_metric, PAGEBLOCK_SIZE);		
 #endif
 #ifdef DBUG
 					printf("UNMMAP PAGEBLOCK FROM A SUPERBLOCK, CACHE IS FULL\n");
