@@ -14,9 +14,9 @@ void *job() {
 	for(int i=0; i<10000; i++){
 		ad[i] = (int *) malloc(100*sizeof(char));
 		counter++;
-		if(i == 1000 || i == 3000){
-			sleep(0.5);
-		}
+		// if(i == 1000 || i == 3000){
+		// 	sleep(0.5);
+		// }
 	}
 	for(int i=1; i<10000; i += 2){
 		free((void *) ad[i]);

@@ -83,7 +83,7 @@ int object_class_exists(size_t size) {				// if objects of this size already exi
 	int position;
 
 	position = get_object_class(size);
-	if(mem.obj[position].active_tail == NULL) {
+	if (mem.obj[position].active_head == NULL) {
 		return -1;
 	}
 	return position;
@@ -199,7 +199,12 @@ void *my_malloc(size_t size) {
 	}
 
 	position = object_class_exists(object_size);
-	if (position == -1 ) {
+	if (position == -1 || mem.obj[position].active_head->num_unalloc_objs == 0) {
+#ifdef DBUG
+		printf("Allocate_memory call\n");
+		fflush(stdout);
+#endif
+
 		ret_val = allocate_memory(object_size);
 		if (ret_val == -1) {
 			return NULL;
@@ -244,32 +249,31 @@ void *my_malloc(size_t size) {
 			/* The address to return, to the rest of them just add them in free list */
 			address = (void *) addrs;
 			/* Take the next address (if not NULL) and start save the rest of them in free list */
-			if (addrs->next == NULL) {
-				return address;
-			}
-			addrs = addrs->next;
-			for (curr = addrs, temp = addrs->next; curr != NULL;) {
-				stack((node_t *) &(mem.obj[position].active_head->freed_list), curr);
-				mem.obj[position].active_head->num_freed_objs++;
-				curr = temp;
-				if (temp != NULL) {
-					temp = temp->next;
+			if (addrs->next != NULL) {
+				addrs = addrs->next;
+				for (curr = addrs, temp = addrs->next; curr != NULL;) {
+					stack((node_t *) &(mem.obj[position].active_head->freed_list), curr);
+					mem.obj[position].active_head->num_freed_objs++;
+					curr = temp;
+					if (temp != NULL) {
+						temp = temp->next;
+					}
 				}
 			}
 		}
 	}
 
-	if (position == -1 || mem.obj[position].active_head->num_unalloc_objs == 0) {
-#ifdef DBUG
-		printf("Allocate_memory call\n");
-		fflush(stdout);
-#endif
-		ret_val = allocate_memory(object_size);
-		if (ret_val == -1) {
-			return NULL;
-		}
-		position = get_object_class(object_size);
-	}
+// 	if (position == -1 || mem.obj[position].active_head->num_unalloc_objs == 0) {
+// #ifdef DBUG
+// 		printf("Allocate_memory call\n");
+// 		fflush(stdout);
+// #endif
+// 		ret_val = allocate_memory(object_size);
+// 		if (ret_val == -1) {
+// 			return NULL;
+// 		}
+// 		position = get_object_class(object_size);
+// 	}
 
 #ifdef DBUG	
 	/* Get from superblock */
