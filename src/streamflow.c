@@ -240,10 +240,21 @@ void *my_malloc(size_t size) {
 			mem.obj[position].active_head->num_alloc_objs++;
 		}
 		else {
+			node_t * curr, *temp;
+			/* The address to return, to the rest of them just add them in free list */
 			address = (void *) addrs;
-			for (node_t *curr = addrs->next; curr != NULL; curr = curr->next) {
-				stack( (node_t *) &(mem.obj[position].active_head->freed_list), curr);
+			/* Take the next address (if not NULL) and start save the rest of them in free list */
+			if (addrs->next == NULL) {
+				return address;
+			}
+			addrs = addrs->next;
+			for (curr = addrs, temp = addrs->next; curr != NULL;) {
+				stack((node_t *) &(mem.obj[position].active_head->freed_list), curr);
 				mem.obj[position].active_head->num_freed_objs++;
+				curr = temp;
+				if (temp != NULL) {
+					temp = temp->next;
+				}
 			}
 		}
 	}
@@ -283,7 +294,7 @@ void *my_malloc(size_t size) {
 	return address;
 }
 
-void my_free(void *address){
+void my_free(void *address) {
 	unsigned long mask;
 	pageblock_t *my_pageblock;
 	char is_it_magic[72];
@@ -322,8 +333,8 @@ void my_free(void *address){
 
 				if (addrs != NULL) {
 					node_t * curr, *temp;
-					for(curr = addrs, temp = addrs->next; curr != NULL;) {
-						stack( (node_t *) &(my_pageblock->heap->active_head->freed_list), curr);
+					for (curr = addrs, temp = addrs->next; curr != NULL;) {
+						stack((node_t *) &(my_pageblock->heap->active_head->freed_list), curr);
 						my_pageblock->heap->active_head->num_freed_objs++;
 						curr = temp;
 						if (temp != NULL) {

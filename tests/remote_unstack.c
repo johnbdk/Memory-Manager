@@ -14,11 +14,9 @@ void *job() {
 		random = 100;//(rand() + 1)%2048;
 		ad[i] = malloc(random*sizeof(double));
 		counter++;
-		if (i == 1000 || i == 3000) {
-			sleep(0.5);
-		}
 	}
-	while(counter != 0);
+	
+	while (counter == 5000);
 	for (int i = 5000; i < 10000; i++) {
 		free((void *) ad[i]);
 	}
@@ -28,17 +26,13 @@ void *job() {
 void *job2() {
 	int i = 0;
 
-	while(i < 5000) {
-		while(counter < 5000);
+	while (i < 5000) {
+		while (counter < 5000);
 
 		printf("will free small\n");
 		fflush(stdout);
 		free((void *) ad[i]);
 		i++;
-		
-		// if( i == 2500){
-		// 	sleep(0.5);
-		// }
 	}
 	counter = 0;
 	return NULL;
